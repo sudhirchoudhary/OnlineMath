@@ -14,6 +14,7 @@ class Repository @Inject constructor(
     private val expressionDao: ExpressionDao
 ) {
     suspend fun getResult(query: String) = apiService.getResult(query).mapToResponse()
+    suspend fun getResultPost(query: ExpressionsRequest) = apiService.getPostResult(query).mapToResponse()
 
     suspend fun insertExpressionInDb(expression: Expression) {
         withContext(Dispatchers.IO) {

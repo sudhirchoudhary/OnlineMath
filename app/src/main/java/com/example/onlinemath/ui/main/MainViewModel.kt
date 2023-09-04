@@ -1,13 +1,21 @@
 package com.example.onlinemath.ui.main
 
+import android.app.Application
 import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
+import com.example.onlinemath.ApiWorker
 import com.example.onlinemath.Repository
 import com.example.onlinemath.api.Response
 import com.example.onlinemath.convertMilliSecondsToDate
 import com.example.onlinemath.room.Expression
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -22,8 +30,9 @@ const val TAG = "RequestX"
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val repository: Repository
-) : ViewModel() {
+    private val repository: Repository,
+    private val applicationContext: Application
+) : AndroidViewModel(applicationContext) {
     private val _result = MutableStateFlow(MainScreenUiState())
     private val expressionList = mutableListOf<Expression>()
     val result = _result.stateIn(
@@ -40,12 +49,21 @@ class MainViewModel @Inject constructor(
         HistoryScreenUiState()
     )
 
+    init {
+        getHistoryList()
+    }
+
     private fun evaluateExpression(expr: String) {
         //val formattedExpression = expr.encodeToUrl()
         expressionList.clear()
         _result.value = MainScreenUiState(isLoading = true)
         viewModelScope.launch(Dispatchers.IO) {
-            val deferred = expr.mapToExpression().map {expression ->
+            val request = OneTimeWorkRequest.Builder(ApiWorker::class.java).setInputData(
+                Data.Builder().putStringArray("expressions", expr.mapToStringArray()).build()
+            )
+            WorkManager.getInstance(applicationContext)
+                .enqueueUniqueWork("api_call", ExistingWorkPolicy.REPLACE, request.build())
+            /*val deferred = expr.mapToExpression().map {expression ->
                 viewModelScope.async {
                     Log.d(TAG, "evaluateExpression: encoded exp = ${expression.encodedExpression}")
                     try {
@@ -78,8 +96,8 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            deferred.awaitAll()
-            _result.value = MainScreenUiState(expressionsList = expressionList, isLoading = false)
+            deferred.awaitAll()*/
+            //_result.value = MainScreenUiState(expressionsList = expressionList, isLoading = false)
         }
     }
 
@@ -90,6 +108,9 @@ class MainViewModel @Inject constructor(
             )
             try {
                 repository.getExpressionsFromDb().collect {
+                    _result.value = MainScreenUiState(
+                        isLoading = false, expressionsList = it
+                    )
                     _historyList.value = HistoryScreenUiState(
                         isLoading = false,
                         expressionsList = it
@@ -114,12 +135,15 @@ class MainViewModel @Inject constructor(
             is MainScreenUiEvent.OnSolveButtonClicked -> {
                 evaluateExpression(mainScreenUiEvent.expr)
             }
+
             MainScreenUiEvent.OnDeleteEvent -> {
                 deleteAllHistory()
             }
+
             MainScreenUiEvent.OnFetchHistory -> {
                 getHistoryList()
             }
+
             else -> {}
         }
     }
@@ -138,10 +162,10 @@ data class HistoryScreenUiState(
 
 sealed interface MainScreenUiEvent {
     data class OnSolveButtonClicked(val expr: String) : MainScreenUiEvent
-    object OnBackEvent: MainScreenUiEvent
-    object OnDeleteEvent: MainScreenUiEvent
-    object OnHistoryEvent: MainScreenUiEvent
-    object OnFetchHistory: MainScreenUiEvent
+    object OnBackEvent : MainScreenUiEvent
+    object OnDeleteEvent : MainScreenUiEvent
+    object OnHistoryEvent : MainScreenUiEvent
+    object OnFetchHistory : MainScreenUiEvent
 }
 
 fun String.mapToExpression(): List<Expression> {
@@ -153,4 +177,8 @@ fun String.mapToExpression(): List<Expression> {
             date = System.currentTimeMillis().convertMilliSecondsToDate()
         )
     }
+}
+
+fun String.mapToStringArray(): Array<String> {
+    return split("\n").toTypedArray()
 }

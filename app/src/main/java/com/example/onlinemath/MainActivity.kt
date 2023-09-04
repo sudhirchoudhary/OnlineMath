@@ -13,6 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.example.onlinemath.ui.history.HistoryScreen
 import com.example.onlinemath.ui.main.MainScreen
 import com.example.onlinemath.ui.main.MainScreenUiEvent
