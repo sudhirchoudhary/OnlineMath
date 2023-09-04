@@ -12,6 +12,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -26,7 +27,7 @@ class ApiWorker @AssistedInject constructor(
     private val expressions = inputData.getStringArray("expressions") ?: emptyArray()
 
     override suspend fun doWork(): Result {
-        CoroutineScope(Dispatchers.IO).launch {
+        val job = CoroutineScope(Dispatchers.IO).launch {
             repository.getResultPost(
                 ExpressionsRequest(
                     expr = expressions.toList()
@@ -56,6 +57,8 @@ class ApiWorker @AssistedInject constructor(
                 }
             }
         }
+
+        job.join()
         return Result.success()
     }
 
